@@ -1,0 +1,2704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaptionAI — Intelligent Video Captioning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@400;600;700&family=Playfair+Display:wght@700&family=Anton&family=Montserrat:wght@400;700;900&family=Raleway:wght@400;700&family=Exo+2:wght@400;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070709;
+    --bg2: #0e0e14;
+    --bg3: #16161f;
+    --bg4: #1e1e2a;
+    --border: #2a2a3a;
+    --cyan: #00e5ff;
+    --cyan-dim: #00b8cc;
+    --amber: #ffb800;
+    --amber-dim: #cc9200;
+    --green: #00ff88;
+    --red: #ff4466;
+    --text: #e8e8f0;
+    --text2: #9090a8;
+    --text3: #5a5a72;
+    --panel-w: 300px;
+    --timeline-h: 160px;
+    --header-h: 56px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+  }
+
+  /* HEADER */
+  header {
+    height: var(--header-h);
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 3px;
+    background: linear-gradient(135deg, var(--cyan), var(--amber));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    flex-shrink: 0;
+  }
+
+  .logo-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: -6px;
+    -webkit-text-fill-color: var(--text3);
+  }
+
+  .header-sep { flex: 1; }
+
+  .status-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text3);
+    letter-spacing: 1px;
+    transition: all 0.3s;
+  }
+  .status-pill.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,0.06); }
+  .status-pill.processing { border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,0.06); animation: pulse-amber 1.5s infinite; }
+  .status-pill.done { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.06); }
+
+  @keyframes pulse-amber { 0%,100% { opacity:1 } 50% { opacity:0.5 } }
+
+  .btn {
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--cyan); color: #000; }
+  .btn-primary:hover { background: #33ecff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,229,255,0.3); }
+  .btn-amber { background: var(--amber); color: #000; }
+  .btn-amber:hover { background: #ffc933; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(255,184,0,0.3); }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--text2); color: var(--text); background: var(--bg3); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* LEFT PANEL — Caption List */
+  .panel-left {
+    width: var(--panel-w);
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--text3);
+    text-transform: uppercase;
+  }
+
+  .caption-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .caption-list::-webkit-scrollbar { width: 4px; }
+  .caption-list::-webkit-scrollbar-track { background: transparent; }
+  .caption-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .caption-item {
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg3);
+  }
+  .caption-item:hover { border-color: var(--border); background: var(--bg4); }
+  .caption-item.selected { border-color: var(--cyan); background: rgba(0,229,255,0.06); }
+  .caption-item.active-now { border-color: var(--amber); background: rgba(255,184,0,0.06); }
+
+  .caption-timecode {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--cyan);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+  .caption-item.active-now .caption-timecode { color: var(--amber); }
+
+  .caption-text-edit {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+    cursor: text;
+  }
+  .caption-text-edit:focus { color: #fff; }
+
+  .no-captions {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  /* CENTER — Video Preview */
+  .center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .video-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+  }
+
+  #videoEl {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+  }
+
+  .caption-overlay {
+    position: absolute;
+    pointer-events: none;
+    top: 0; left: 0; right: 0; bottom: 0;
+  }
+
+  .caption-display {
+    position: absolute;
+    cursor: move;
+    pointer-events: all;
+    user-select: none;
+    max-width: 85%;
+    text-align: center;
+    transform: translate(-50%, -50%);
+    padding: 6px 12px;
+    border-radius: 4px;
+    line-height: 1.4;
+    transition: opacity 0.1s;
+  }
+
+  .upload-zone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--bg);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    background: var(--bg2);
+  }
+
+  .upload-icon {
+    width: 80px;
+    height: 80px;
+    border: 2px dashed var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    transition: all 0.2s;
+  }
+  .upload-zone:hover .upload-icon, .upload-zone.drag-over .upload-icon {
+    border-color: var(--cyan);
+    box-shadow: 0 0 30px rgba(0,229,255,0.2);
+  }
+
+  .upload-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: var(--text2);
+  }
+  .upload-sub { font-size: 11px; color: var(--text3); letter-spacing: 0.5px; }
+
+  #fileInput { display: none; }
+
+  /* PLAYBACK CONTROLS */
+  .playback-bar {
+    padding: 10px 16px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .play-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--cyan);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #000;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .play-btn:hover { transform: scale(1.1); box-shadow: 0 0 20px rgba(0,229,255,0.4); }
+
+  .timecode-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--cyan);
+    min-width: 120px;
+  }
+
+  .seek-bar-wrap {
+    flex: 1;
+    height: 4px;
+    background: var(--bg4);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+  .seek-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--amber));
+    border-radius: 2px;
+    pointer-events: none;
+    transition: width 0.1s;
+  }
+  .seek-bar-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%,-50%);
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(0,229,255,0.6);
+    pointer-events: none;
+  }
+
+  /* TIMELINE */
+  .timeline-section {
+    height: var(--timeline-h);
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .timeline-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .timeline-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--text3);
+    text-transform: uppercase;
+  }
+
+  .zoom-btn {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+  .zoom-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  .timeline-body {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    padding: 8px 0;
+  }
+  .timeline-body::-webkit-scrollbar { height: 4px; }
+  .timeline-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .timeline-inner {
+    position: relative;
+    height: 100%;
+    min-width: 100%;
+  }
+
+  .timeline-ticks {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 20px;
+    pointer-events: none;
+  }
+
+  .timeline-track {
+    position: absolute;
+    top: 26px;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--bg3);
+    border-radius: 4px;
+    margin: 0 8px;
+  }
+
+  .caption-block {
+    position: absolute;
+    top: 4px;
+    height: 52px;
+    background: rgba(0,229,255,0.15);
+    border: 1px solid var(--cyan-dim);
+    border-radius: 4px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 10px;
+    color: var(--cyan);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+    min-width: 40px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .caption-block:hover { background: rgba(0,229,255,0.25); }
+  .caption-block.selected { background: rgba(0,229,255,0.3); border-color: var(--cyan); box-shadow: 0 0 12px rgba(0,229,255,0.3); }
+  .caption-block .resize-handle {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,0.4));
+    border-radius: 0 4px 4px 0;
+  }
+
+  .timeline-playhead {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: var(--amber);
+    pointer-events: none;
+    z-index: 10;
+  }
+  .timeline-playhead::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px; height: 10px;
+    background: var(--amber);
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+  }
+
+  /* RIGHT PANEL — Style Controls */
+  .panel-right {
+    width: var(--panel-w);
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+  .panel-right::-webkit-scrollbar { width: 4px; }
+  .panel-right::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .style-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .style-section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .form-label {
+    font-size: 11px;
+    color: var(--text2);
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+
+  select, input[type=number] {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 5px 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  select:focus, input[type=number]:focus { border-color: var(--cyan); }
+  select option { background: var(--bg3); }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--bg4);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 6px rgba(0,229,255,0.4);
+    cursor: pointer;
+  }
+
+  input[type=color] {
+    width: 36px; height: 28px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: transparent;
+    padding: 2px;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .range-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--cyan);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  .toggle-group {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .toggle-btn {
+    flex: 1;
+    height: 28px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .toggle-btn.active { background: var(--cyan); color: #000; border-color: var(--cyan); font-weight: 600; }
+  .toggle-btn:hover:not(.active) { border-color: var(--text2); color: var(--text); }
+
+  .position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+
+  .pos-btn {
+    height: 28px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+  }
+  .pos-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .pos-btn.active { background: var(--amber); color: #000; border-color: var(--amber); font-weight: 600; }
+
+  /* TRANSCRIPT PANEL */
+  .transcript-box {
+    width: 100%;
+    min-height: 80px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    color: var(--text2);
+    font-size: 11px;
+    line-height: 1.7;
+    font-family: 'DM Sans', sans-serif;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .transcript-box:focus { border-color: var(--cyan); }
+
+  /* PROGRESS BAR */
+  .progress-wrap {
+    position: fixed;
+    bottom: var(--timeline-h);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 24px;
+    z-index: 200;
+    min-width: 320px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    display: none;
+  }
+  .progress-wrap.visible { display: block; }
+  .progress-title { font-size: 12px; color: var(--text2); margin-bottom: 10px; letter-spacing: 0.5px; }
+  .progress-bar-outer { height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
+  .progress-bar-inner { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--amber)); border-radius: 3px; transition: width 0.3s; }
+  .progress-sub { margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text3); }
+
+  /* EXPORT MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    display: none;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    min-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+  }
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    margin-bottom: 6px;
+  }
+  .modal-sub { font-size: 12px; color: var(--text3); margin-bottom: 24px; }
+  .modal-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .export-option {
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .export-option:hover { border-color: var(--cyan); background: rgba(0,229,255,0.05); }
+  .export-option.selected { border-color: var(--cyan); background: rgba(0,229,255,0.1); }
+  .export-icon { font-size: 22px; }
+  .export-label { font-size: 13px; font-weight: 600; color: var(--text); }
+  .export-desc { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* API KEY input */
+  .api-key-wrap {
+    padding: 14px 16px;
+    background: rgba(255,184,0,0.04);
+    border-bottom: 1px solid var(--border);
+  }
+  .api-key-wrap input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--amber-dim);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .api-key-wrap input:focus { border-color: var(--amber); }
+  .api-key-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  /* Tooltips */
+  [title] { position: relative; }
+
+  /* Tick labels */
+  .tick-label {
+    position: absolute;
+    top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text3);
+    transform: translateX(-50%);
+  }
+  .tick-line {
+    position: absolute;
+    top: 16px;
+    bottom: 0;
+    width: 1px;
+    background: var(--bg4);
+  }
+
+  .kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+  }
+
+  .add-caption-btn {
+    margin: 8px;
+    width: calc(100% - 16px);
+    height: 32px;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .add-caption-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  .switch {
+    position: relative;
+    width: 36px; height: 20px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--bg4);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: 1px solid var(--border);
+  }
+  .switch-slider::before {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    left: 2px; top: 50%;
+    transform: translateY(-50%);
+    background: var(--text3);
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+  .switch input:checked + .switch-slider { background: rgba(0,229,255,0.2); border-color: var(--cyan); }
+  .switch input:checked + .switch-slider::before { left: 18px; background: var(--cyan); }
+
+  .color-swatch-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .color-swatch {
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .color-swatch:hover, .color-swatch.active { border-color: #fff; }
+
+  /* Waveform-like decoration */
+  .waveform-deco {
+    position: absolute;
+    left: 8px; right: 8px;
+    top: 26px;
+    height: 60px;
+    pointer-events: none;
+    opacity: 0.08;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div>
+    <div class="logo">CAPTION<span style="color:var(--amber);-webkit-text-fill-color:var(--amber)">AI</span></div>
+    <div class="logo-sub">Intelligent Video Captioning</div>
+  </div>
+  <div class="header-sep"></div>
+  <span id="statusPill" class="status-pill">READY</span>
+  <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">⬆ Upload Video</button>
+  <button class="btn btn-primary" id="transcribeBtn" disabled onclick="startTranscription()">✦ Transcribe</button>
+  <button class="btn btn-amber" id="exportBtn" disabled onclick="openExportModal()">🎬 Export Video</button>
+  <input type="file" id="fileInput" accept="video/*" onchange="handleFileSelect(event)">
+</header>
+
+<div class="main">
+
+  <!-- LEFT — Caption List -->
+  <div class="panel-left">
+    <div class="panel-header">
+      <span>Captions</span>
+      <span id="captionCount" style="color:var(--cyan)">0</span>
+    </div>
+
+    <!-- API Key -->
+    <div class="api-key-wrap">
+      <div class="api-key-label">Groq API Key — <a href="https://console.groq.com" target="_blank" style="color:var(--amber);text-decoration:none">Get Free Key ↗</a></div>
+      <input type="password" id="apiKeyInput" placeholder="gsk_..." value="">
+    </div>
+
+    <div class="caption-list" id="captionList">
+      <div class="no-captions">
+        Upload a video and click<br><strong style="color:var(--cyan)">✦ Transcribe</strong><br>to auto-generate captions<br><br>
+        <span style="font-size:10px;color:var(--amber)">⚡ Powered by Groq — Free</span><br>
+        <a href="https://console.groq.com" target="_blank" style="font-size:10px;color:var(--text3);text-decoration:none;">Get your free key ↗</a>
+      </div>
+    </div>
+    <button class="add-caption-btn" onclick="addManualCaption()">+ Add Caption Manually</button>
+  </div>
+
+  <!-- CENTER — Video -->
+  <div class="center">
+    <div class="video-wrapper" id="videoWrapper">
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">🎬</div>
+        <div class="upload-title">Drop Video Here</div>
+        <div class="upload-sub">MP4, MOV, WebM, AVI · Max 500MB</div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+          <span class="kbd">Drag & Drop</span>
+          <span class="kbd">or Click</span>
+        </div>
+      </div>
+      <video id="videoEl" style="display:none" playsinline></video>
+      <div class="caption-overlay" id="captionOverlay"></div>
+    </div>
+
+    <!-- Playback -->
+    <div class="playback-bar">
+      <button class="play-btn" id="playBtn" onclick="togglePlay()">▶</button>
+      <span class="timecode-display" id="timecodeDisplay">00:00.000 / 00:00.000</span>
+      <div class="seek-bar-wrap" id="seekBar" onclick="seekTo(event)">
+        <div class="seek-bar-fill" id="seekFill" style="width:0%"></div>
+        <div class="seek-bar-thumb" id="seekThumb" style="left:0%"></div>
+      </div>
+      <span style="font-size:10px;color:var(--text3)"><span class="kbd">Space</span> Play</span>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline-section">
+      <div class="timeline-header">
+        <span class="timeline-label">Timeline</span>
+        <div style="flex:1"></div>
+        <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+        <span id="zoomLabel" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);min-width:36px;text-align:center">1×</span>
+        <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+      </div>
+      <div class="timeline-body" id="timelineBody">
+        <div class="timeline-inner" id="timelineInner">
+          <div class="timeline-ticks" id="timelineTicks"></div>
+          <div class="timeline-track" id="timelineTrack">
+            <svg class="waveform-deco" id="waveformDeco" viewBox="0 0 800 60" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="timeline-playhead" id="timelinePlayhead" style="left:0px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT — Style Panel -->
+  <div class="panel-right">
+    <div class="panel-header">
+      <span>Style & Position</span>
+    </div>
+
+    <!-- Font -->
+    <div class="style-section">
+      <div class="style-section-title">Typography</div>
+
+      <div class="form-row">
+        <span class="form-label">Font</span>
+        <select id="fontFamily" onchange="updateStyle('fontFamily', this.value)">
+          <option value="'Bebas Neue', sans-serif">Bebas Neue</option>
+          <option value="'Anton', sans-serif">Anton</option>
+          <option value="'Oswald', sans-serif">Oswald</option>
+          <option value="'Montserrat', sans-serif" selected>Montserrat</option>
+          <option value="'Raleway', sans-serif">Raleway</option>
+          <option value="'Exo 2', sans-serif">Exo 2</option>
+          <option value="'Orbitron', sans-serif">Orbitron</option>
+          <option value="'Playfair Display', serif">Playfair Display</option>
+          <option value="'DM Sans', sans-serif">DM Sans</option>
+          <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Courier New', monospace">Courier New</option>
+          <option value="Impact, sans-serif">Impact</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <span class="form-label">Size</span>
+        <input type="range" id="fontSize" min="10" max="100" value="28" oninput="updateStyle('fontSize', this.value+'px'); document.getElementById('fontSizeVal').textContent=this.value">
+        <span class="range-val" id="fontSizeVal">28</span>
+      </div>
+
+      <div class="form-row">
+        <span class="form-label">Weight</span>
+        <div class="toggle-group">
+          <button class="toggle-btn" onclick="setWeight('400',this)">Normal</button>
+          <button class="toggle-btn active" onclick="setWeight('700',this)">Bold</button>
+          <button class="toggle-btn" onclick="setWeight('900',this)">Black</button>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <span class="form-label">Transform</span>
+        <div class="toggle-group">
+          <button class="toggle-btn active" onclick="setTransform('none',this)">Aa</button>
+          <button class="toggle-btn" onclick="setTransform('uppercase',this)">AA</button>
+          <button class="toggle-btn" onclick="setTransform('lowercase',this)">aa</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Colors -->
+    <div class="style-section">
+      <div class="style-section-title">Colors</div>
+
+      <div class="form-row">
+        <span class="form-label">Text</span>
+        <input type="color" id="fontColor" value="#ffffff" oninput="updateStyle('color', this.value)">
+        <div class="color-swatch-row" style="flex:1">
+          <div class="color-swatch active" style="background:#ffffff" onclick="pickColor('fontColor','#ffffff',this)"></div>
+          <div class="color-swatch" style="background:#ffff00" onclick="pickColor('fontColor','#ffff00',this)"></div>
+          <div class="color-swatch" style="background:#00e5ff" onclick="pickColor('fontColor','#00e5ff',this)"></div>
+          <div class="color-swatch" style="background:#ffb800" onclick="pickColor('fontColor','#ffb800',this)"></div>
+          <div class="color-swatch" style="background:#ff4466" onclick="pickColor('fontColor','#ff4466',this)"></div>
+          <div class="color-swatch" style="background:#00ff88" onclick="pickColor('fontColor','#00ff88',this)"></div>
+          <div class="color-swatch" style="background:#000000;border:1px solid #444" onclick="pickColor('fontColor','#000000',this)"></div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <span class="form-label">Background</span>
+        <label class="switch"><input type="checkbox" id="bgToggle" onchange="updateBg()"><div class="switch-slider"></div></label>
+        <input type="color" id="bgColor" value="#000000" oninput="updateBg()">
+        <input type="range" id="bgOpacity" min="0" max="100" value="70" oninput="updateBg(); document.getElementById('bgOpVal').textContent=this.value+'%'" style="width:50px">
+        <span class="range-val" id="bgOpVal">70%</span>
+      </div>
+
+      <div class="form-row" style="align-items:flex-start;gap:4px">
+        <span class="form-label">Stroke</span>
+        <label class="switch"><input type="checkbox" id="strokeToggle" onchange="updateStroke()"><div class="switch-slider"></div></label>
+        <input type="color" id="strokeColor" value="#000000" oninput="updateStroke()">
+        <input type="range" id="strokeWidth" min="1" max="8" value="2" oninput="updateStroke(); document.getElementById('strokeWVal').textContent=this.value" style="width:50px">
+        <span class="range-val" id="strokeWVal">2</span>
+      </div>
+    </div>
+
+    <!-- Shadow -->
+    <div class="style-section">
+      <div class="style-section-title">Shadow</div>
+      <div class="form-row">
+        <span class="form-label">Enable</span>
+        <label class="switch"><input type="checkbox" id="shadowToggle" checked onchange="updateShadow()"><div class="switch-slider"></div></label>
+        <input type="color" id="shadowColor" value="#000000" oninput="updateShadow()">
+      </div>
+      <div class="form-row">
+        <span class="form-label">Blur</span>
+        <input type="range" id="shadowBlur" min="0" max="20" value="6" oninput="updateShadow(); document.getElementById('shadowBlurVal').textContent=this.value">
+        <span class="range-val" id="shadowBlurVal">6</span>
+      </div>
+    </div>
+
+    <!-- Alignment -->
+    <div class="style-section">
+      <div class="style-section-title">Alignment</div>
+      <div class="form-row">
+        <span class="form-label">Align</span>
+        <div class="toggle-group">
+          <button class="toggle-btn" onclick="setAlign('left',this)">◀</button>
+          <button class="toggle-btn active" onclick="setAlign('center',this)">■</button>
+          <button class="toggle-btn" onclick="setAlign('right',this)">▶</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-label">Spacing</span>
+        <input type="range" id="letterSpacing" min="-2" max="12" value="0" oninput="updateStyle('letterSpacing', this.value+'px'); document.getElementById('lsVal').textContent=this.value">
+        <span class="range-val" id="lsVal">0</span>
+      </div>
+    </div>
+
+    <!-- Position -->
+    <div class="style-section">
+      <div class="style-section-title">Position Presets</div>
+      <div class="position-grid" id="positionGrid">
+        <button class="pos-btn" onclick="setPosition(10,10,this)">↖ TL</button>
+        <button class="pos-btn" onclick="setPosition(50,10,this)">↑ TC</button>
+        <button class="pos-btn" onclick="setPosition(90,10,this)">↗ TR</button>
+        <button class="pos-btn" onclick="setPosition(10,50,this)">← ML</button>
+        <button class="pos-btn" onclick="setPosition(50,50,this)">● MC</button>
+        <button class="pos-btn" onclick="setPosition(90,50,this)">→ MR</button>
+        <button class="pos-btn" onclick="setPosition(10,85,this)">↙ BL</button>
+        <button class="pos-btn active" onclick="setPosition(50,85,this)">↓ BC</button>
+        <button class="pos-btn" onclick="setPosition(90,85,this)">↘ BR</button>
+      </div>
+      <div class="form-row" style="margin-top:10px">
+        <span class="form-label">X %</span>
+        <input type="number" id="posX" value="50" min="1" max="99" onchange="updatePositionFromInputs()">
+        <span class="form-label" style="min-width:20px">Y %</span>
+        <input type="number" id="posY" value="85" min="1" max="99" onchange="updatePositionFromInputs()">
+      </div>
+    </div>
+
+    <!-- Apply scope -->
+    <div class="style-section">
+      <div class="style-section-title">Apply To</div>
+      <div class="form-row">
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="applySelected" onclick="setApplyScope('selected',this)">Selected</button>
+          <button class="toggle-btn" id="applyAll" onclick="setApplyScope('all',this)">All Captions</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-wrap" id="progressWrap">
+  <div class="progress-title" id="progressTitle">Extracting audio…</div>
+  <div class="progress-bar-outer"><div class="progress-bar-inner" id="progressBar" style="width:0%"></div></div>
+  <div class="progress-sub" id="progressSub">Preparing…</div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="min-width:500px">
+    <div class="modal-title">Export Video</div>
+    <div class="modal-sub">Choose how the text appears in your exported video</div>
+    <div class="modal-options" id="exportOptions">
+
+      <!-- ★ TikTok Word-by-Word — THE MAIN MODE -->
+      <div class="export-option selected" data-fmt="wordbyword" onclick="selectExportFmt(this)" style="border-color:var(--amber);background:rgba(255,184,0,0.06)">
+        <div class="export-icon">⚡</div>
+        <div>
+          <div class="export-label">
+            Word-by-Word Flash
+            <span style="background:var(--amber);color:#000;font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;margin-left:6px">TIKTOK STYLE</span>
+          </div>
+          <div class="export-desc">Each word flashes individually center-screen (~0.4s each). Bold white text, black pill background — exactly like the Japan video. Your font & color applied.</div>
+        </div>
+      </div>
+
+      <!-- Timed styled captions -->
+      <div class="export-option" data-fmt="video" onclick="selectExportFmt(this)">
+        <div class="export-icon">🎬</div>
+        <div>
+          <div class="export-label">Timed Styled Text</div>
+          <div class="export-desc">Full sentence captions at custom position, font & size — one at a time per your timeline.</div>
+        </div>
+      </div>
+
+      <div class="export-option" data-fmt="srt" onclick="selectExportFmt(this)">
+        <div class="export-icon">📄</div>
+        <div>
+          <div class="export-label">SRT Subtitle File</div>
+          <div class="export-desc">Standard .srt for YouTube, video players, etc.</div>
+        </div>
+      </div>
+      <div class="export-option" data-fmt="json" onclick="selectExportFmt(this)">
+        <div class="export-icon">{ }</div>
+        <div>
+          <div class="export-label">JSON Data</div>
+          <div class="export-desc">Full caption data with styles and positions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Word-by-word settings (shown only when that mode selected) -->
+    <div id="wbwSettings" style="margin-top:14px;padding:14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--amber);text-transform:uppercase;margin-bottom:10px">Word Flash Settings</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--text2)">Sec per word</span>
+          <input type="range" id="wbwSpeed" min="0.2" max="1.0" step="0.05" value="0.4" style="width:80px"
+            oninput="document.getElementById('wbwSpeedVal').textContent=parseFloat(this.value).toFixed(2)+'s'">
+          <span id="wbwSpeedVal" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cyan);min-width:36px">0.40s</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--text2)">Font size</span>
+          <input type="range" id="wbwSize" min="30" max="120" step="2" value="72" style="width:80px"
+            oninput="document.getElementById('wbwSizeVal').textContent=this.value+'px'">
+          <span id="wbwSizeVal" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cyan);min-width:36px">72px</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--text2)">Text color</span>
+          <input type="color" id="wbwColor" value="#ffffff" style="width:32px;height:26px;border-radius:4px;border:1px solid var(--border);padding:2px;background:transparent;cursor:pointer">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--text2)">Pill color</span>
+          <input type="color" id="wbwBg" value="#000000" style="width:32px;height:26px;border-radius:4px;border:1px solid var(--border);padding:2px;background:transparent;cursor:pointer">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--text2)">Position Y%</span>
+          <input type="number" id="wbwPosY" value="50" min="10" max="90"
+            style="width:52px;background:var(--bg4);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 6px;font-size:11px;outline:none">
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeExportModal()">Cancel</button>
+      <button class="btn btn-amber" onclick="doExport()" style="min-width:140px">⬇ Export Video</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIDEO RENDER PROGRESS MODAL -->
+<div class="modal-overlay" id="renderModal">
+  <div class="modal" style="min-width:460px;text-align:center">
+    <div class="modal-title" style="margin-bottom:6px">🎬 Burning Styled Text Into Video</div>
+    <div class="modal-sub" id="renderStatusText">Preparing canvas renderer…</div>
+    <div style="margin:20px 0">
+      <div style="height:8px;background:var(--bg4);border-radius:4px;overflow:hidden">
+        <div id="renderProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--amber));border-radius:4px;transition:width 0.2s"></div>
+      </div>
+      <div id="renderProgressPct" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--cyan);margin-top:8px">0%</div>
+    </div>
+    <div id="renderETA" style="font-size:11px;color:var(--text3);margin-bottom:16px"></div>
+    <canvas id="renderCanvas" style="display:none"></canvas>
+    <button class="btn btn-ghost" id="cancelRenderBtn" onclick="cancelRender()" style="margin:0 auto">✕ Cancel</button>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+let captions = [];
+let selectedId = null;
+let videoFile = null;
+let videoDuration = 0;
+let zoom = 1;
+let pxPerSec = 80;
+let applyScope = 'selected';
+let draggingCaption = null;
+let captionDragOffset = { x: 0, y: 0 };
+let selectedExportFmt = 'wordbyword';
+let captionPositionX = 50;
+let captionPositionY = 85;
+
+const globalStyle = {
+  fontFamily: "'Montserrat', sans-serif",
+  fontSize: '28px',
+  color: '#ffffff',
+  fontWeight: '700',
+  textTransform: 'none',
+  textAlign: 'center',
+  letterSpacing: '0px',
+  bgEnabled: false,
+  bgColor: '#000000',
+  bgOpacity: 70,
+  strokeEnabled: false,
+  strokeColor: '#000000',
+  strokeWidth: 2,
+  shadowEnabled: true,
+  shadowColor: '#000000',
+  shadowBlur: 6,
+  posX: 50,
+  posY: 85
+};
+
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+// ─────────────────────────────────────────
+// VIDEO UPLOAD
+// ─────────────────────────────────────────
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('video/')) loadVideo(f);
+});
+
+function handleFileSelect(e) {
+  const f = e.target.files[0];
+  if (f) loadVideo(f);
+}
+
+function loadVideo(file) {
+  videoFile = file;
+  const url = URL.createObjectURL(file);
+  const video = document.getElementById('videoEl');
+  video.src = url;
+  video.style.display = 'block';
+  document.getElementById('uploadZone').style.display = 'none';
+  video.onloadedmetadata = () => {
+    videoDuration = video.duration;
+    updateTimecodeDisplay();
+    renderTimeline();
+    renderWaveformDeco();
+  };
+  document.getElementById('transcribeBtn').disabled = false;
+  document.getElementById('exportBtn').disabled = false;
+  setStatus('active', 'VIDEO LOADED');
+}
+
+// ─────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────
+const video = document.getElementById('videoEl');
+video.addEventListener('timeupdate', () => {
+  const pct = videoDuration ? (video.currentTime / videoDuration * 100) : 0;
+  document.getElementById('seekFill').style.width = pct + '%';
+  document.getElementById('seekThumb').style.left = pct + '%';
+  updateTimecodeDisplay();
+  updateTimelinePlayhead();
+  renderCaptionOverlay();
+  updateActiveCaptionHighlight();
+});
+video.addEventListener('ended', () => {
+  document.getElementById('playBtn').textContent = '▶';
+});
+
+function togglePlay() {
+  if (video.paused) { video.play(); document.getElementById('playBtn').textContent = '⏸'; }
+  else { video.pause(); document.getElementById('playBtn').textContent = '▶'; }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 0.1);
+  if (e.code === 'ArrowRight') video.currentTime = Math.min(videoDuration, video.currentTime + 0.1);
+  if (e.code === 'Delete' && selectedId) deleteCaption(selectedId);
+  if ((e.ctrlKey||e.metaKey) && e.code === 'KeyZ') undo();
+});
+
+function seekTo(e) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  video.currentTime = pct * videoDuration;
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(3);
+  return `${String(m).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}.${String(Math.round((s%1)*1000)).padStart(3,'0')}`;
+}
+
+function formatSRTTime(s) {
+  const h = Math.floor(s/3600);
+  const m = Math.floor((s%3600)/60);
+  const sec = Math.floor(s%60);
+  const ms = Math.round((s%1)*1000);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')},${String(ms).padStart(3,'0')}`;
+}
+
+function updateTimecodeDisplay() {
+  document.getElementById('timecodeDisplay').textContent =
+    formatTime(video.currentTime) + ' / ' + formatTime(videoDuration);
+}
+
+// ─────────────────────────────────────────
+// STATUS
+// ─────────────────────────────────────────
+function setStatus(type, text) {
+  const pill = document.getElementById('statusPill');
+  pill.className = 'status-pill ' + type;
+  pill.textContent = text;
+}
+
+// ─────────────────────────────────────────
+// TRANSCRIPTION — Groq (Whisper Large v3, FREE)
+// ─────────────────────────────────────────
+async function startTranscription() {
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  if (!apiKey) {
+    // Demo mode with mock captions
+    loadDemoCaptions();
+    return;
+  }
+
+  if (!apiKey.startsWith('gsk_')) {
+    const proceed = confirm('⚠️ This looks like it may not be a Groq API key (should start with gsk_).\n\nGet a FREE Groq key at: https://console.groq.com\n\nProceed anyway?');
+    if (!proceed) return;
+  }
+
+  setStatus('processing', 'TRANSCRIBING…');
+  showProgress('Sending audio to Groq Whisper…', 10);
+
+  try {
+    const formData = new FormData();
+
+    // Groq supports mp4, mpeg, mpga, m4a, ogg, wav, webm — send file directly
+    const ext = videoFile.name.split('.').pop().toLowerCase();
+    const mimeMap = { mp4:'video/mp4', mov:'video/quicktime', webm:'video/webm', avi:'video/x-msvideo', m4a:'audio/mp4', mp3:'audio/mpeg', wav:'audio/wav' };
+    const mime = mimeMap[ext] || videoFile.type || 'video/mp4';
+    const safeFile = new File([videoFile], `audio.${ext}`, { type: mime });
+
+    formData.append('file', safeFile);
+    formData.append('model', 'whisper-large-v3');   // Groq's free Whisper model
+    formData.append('response_format', 'verbose_json');
+    formData.append('language', 'en');
+    formData.append('temperature', '0');
+
+    updateProgress(30, 'Uploading to Groq…');
+
+    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      body: formData
+    });
+
+    updateProgress(70, 'Processing with Whisper Large v3…');
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      const msg = errData?.error?.message || `HTTP ${resp.status}`;
+      throw new Error(msg);
+    }
+
+    const data = await resp.json();
+    updateProgress(90, 'Building captions…');
+
+    if (!data.segments || data.segments.length === 0) {
+      // Groq sometimes returns full text without segments — split by sentence
+      const sentences = (data.text || '').match(/[^.!?]+[.!?]*/g) || [data.text];
+      const dur = videoDuration || 10;
+      const segLen = dur / sentences.length;
+      captions = sentences.map((s, i) => ({
+        id: uid(),
+        start: parseFloat((i * segLen).toFixed(3)),
+        end: parseFloat(((i + 1) * segLen).toFixed(3)),
+        text: s.trim(),
+        style: { ...globalStyle },
+        posX: globalStyle.posX,
+        posY: globalStyle.posY
+      }));
+    } else {
+      captions = data.segments.map(seg => ({
+        id: uid(),
+        start: parseFloat((seg.start || 0).toFixed(3)),
+        end: parseFloat((seg.end || seg.start + 2).toFixed(3)),
+        text: seg.text.trim(),
+        style: { ...globalStyle },
+        posX: globalStyle.posX,
+        posY: globalStyle.posY
+      }));
+    }
+
+    updateProgress(100, `✓ ${captions.length} captions generated!`);
+    setTimeout(hideProgress, 1000);
+    setStatus('done', `✓ ${captions.length} CAPTIONS`);
+    renderCaptionList();
+    renderTimeline();
+    saveToStorage();
+
+  } catch (err) {
+    hideProgress();
+    setStatus('active', 'ERROR');
+
+    let hint = '';
+    if (err.message.includes('401') || err.message.toLowerCase().includes('unauthorized')) {
+      hint = '\n\n🔑 Invalid API key. Get a free key at: https://console.groq.com';
+    } else if (err.message.includes('413') || err.message.toLowerCase().includes('too large')) {
+      hint = '\n\n📦 File too large. Groq supports up to 25MB. Try a shorter video clip.';
+    } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      hint = '\n\n🌐 Network error. Check your internet connection.';
+    }
+
+    alert('Transcription failed: ' + err.message + hint + '\n\nLoading demo captions instead.');
+    loadDemoCaptions();
+  }
+}
+
+function loadDemoCaptions() {
+  captions = [
+    { id: uid(), start: 0.5, end: 3.2, text: "Welcome to CaptionAI", style: {...globalStyle}, posX: 50, posY: 85 },
+    { id: uid(), start: 3.5, end: 6.8, text: "Automatic captions powered by AI", style: {...globalStyle}, posX: 50, posY: 85 },
+    { id: uid(), start: 7.2, end: 10.5, text: "Customize font, size, and position", style: {...globalStyle}, posX: 50, posY: 85 },
+    { id: uid(), start: 11.0, end: 14.0, text: "Drag captions anywhere on screen", style: {...globalStyle}, posX: 50, posY: 85 },
+    { id: uid(), start: 14.5, end: 18.0, text: "Export as SRT, VTT, or JSON", style: {...globalStyle}, posX: 50, posY: 85 },
+  ];
+  setStatus('done', 'DEMO MODE');
+  renderCaptionList();
+  renderTimeline();
+  saveToStorage();
+}
+
+// ─────────────────────────────────────────
+// CAPTION LIST RENDER
+// ─────────────────────────────────────────
+function renderCaptionList() {
+  const list = document.getElementById('captionList');
+  document.getElementById('captionCount').textContent = captions.length;
+
+  if (captions.length === 0) {
+    list.innerHTML = `<div class="no-captions">No captions yet.<br>Upload a video and transcribe.</div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  captions.forEach(cap => {
+    const item = document.createElement('div');
+    item.className = 'caption-item' + (cap.id === selectedId ? ' selected' : '');
+    item.dataset.id = cap.id;
+    item.innerHTML = `
+      <div class="caption-timecode">${formatTime(cap.start)} → ${formatTime(cap.end)}</div>
+      <textarea class="caption-text-edit" rows="2" data-id="${cap.id}">${cap.text}</textarea>
+    `;
+    item.addEventListener('click', e => {
+      if (e.target.tagName !== 'TEXTAREA') selectCaption(cap.id);
+    });
+    list.appendChild(item);
+  });
+
+  list.querySelectorAll('.caption-text-edit').forEach(ta => {
+    ta.addEventListener('input', e => {
+      const cap = captions.find(c => c.id === e.target.dataset.id);
+      if (cap) { cap.text = e.target.value; renderCaptionOverlay(); }
+    });
+    ta.addEventListener('focus', e => selectCaption(e.target.dataset.id));
+  });
+}
+
+function selectCaption(id) {
+  selectedId = id;
+  renderCaptionList();
+  renderTimeline();
+
+  // Update style panel to match selected caption's style
+  const cap = captions.find(c => c.id === id);
+  if (cap && cap.style) {
+    syncStylePanelToStyle(cap.style);
+    document.getElementById('posX').value = cap.posX || 50;
+    document.getElementById('posY').value = cap.posY || 85;
+  }
+}
+
+function updateActiveCaptionHighlight() {
+  const t = video.currentTime;
+  document.querySelectorAll('.caption-item').forEach(el => {
+    const id = el.dataset.id;
+    const cap = captions.find(c => c.id === id);
+    if (cap && t >= cap.start && t <= cap.end) el.classList.add('active-now');
+    else el.classList.remove('active-now');
+  });
+}
+
+function addManualCaption() {
+  const t = video.currentTime;
+  const cap = {
+    id: uid(),
+    start: t,
+    end: Math.min(t + 3, videoDuration || t + 3),
+    text: 'New Caption',
+    style: { ...globalStyle },
+    posX: globalStyle.posX,
+    posY: globalStyle.posY
+  };
+  captions.push(cap);
+  captions.sort((a,b) => a.start - b.start);
+  selectCaption(cap.id);
+  renderTimeline();
+}
+
+function deleteCaption(id) {
+  captions = captions.filter(c => c.id !== id);
+  selectedId = null;
+  renderCaptionList();
+  renderTimeline();
+  renderCaptionOverlay();
+}
+
+// ─────────────────────────────────────────
+// CAPTION OVERLAY (on video)
+// ─────────────────────────────────────────
+function renderCaptionOverlay() {
+  const overlay = document.getElementById('captionOverlay');
+  const videoEl = document.getElementById('videoEl');
+  const t = video.currentTime;
+
+  // Clear old
+  overlay.querySelectorAll('.caption-display:not(.drag-target)').forEach(el => el.remove());
+
+  const rect = videoEl.getBoundingClientRect();
+  const wrapRect = document.getElementById('videoWrapper').getBoundingClientRect();
+  if (!rect.width) return;
+
+  const activeNow = captions.filter(c => t >= c.start && t <= c.end);
+
+  activeNow.forEach(cap => {
+    const el = document.createElement('div');
+    el.className = 'caption-display';
+    el.dataset.id = cap.id;
+
+    const s = cap.style;
+    el.style.fontFamily = s.fontFamily;
+    el.style.fontSize = s.fontSize;
+    el.style.fontWeight = s.fontWeight;
+    el.style.color = s.color;
+    el.style.textTransform = s.textTransform;
+    el.style.textAlign = s.textAlign;
+    el.style.letterSpacing = s.letterSpacing;
+    el.style.zIndex = cap.id === selectedId ? 10 : 5;
+
+    if (s.bgEnabled) {
+      const rgb = hexToRgb(s.bgColor);
+      el.style.backgroundColor = `rgba(${rgb.r},${rgb.g},${rgb.b},${s.bgOpacity/100})`;
+    } else {
+      el.style.backgroundColor = 'transparent';
+    }
+
+    let shadow = '';
+    if (s.shadowEnabled) shadow += `2px 2px ${s.shadowBlur}px ${s.shadowColor}`;
+    if (s.strokeEnabled) {
+      const sc = s.strokeColor;
+      const sw = s.strokeWidth;
+      const strokes = [
+        `${sw}px 0 0 ${sc}`,`-${sw}px 0 0 ${sc}`,
+        `0 ${sw}px 0 ${sc}`,`0 -${sw}px 0 ${sc}`
+      ].join(', ');
+      shadow = shadow ? shadow + ', ' + strokes : strokes;
+    }
+    el.style.textShadow = shadow;
+
+    el.textContent = cap.text;
+
+    // Position relative to video element inside wrapper
+    const vOffX = rect.left - wrapRect.left;
+    const vOffY = rect.top - wrapRect.top;
+
+    const px = vOffX + (cap.posX / 100) * rect.width;
+    const py = vOffY + (cap.posY / 100) * rect.height;
+    el.style.left = px + 'px';
+    el.style.top = py + 'px';
+
+    // Draggable
+    el.addEventListener('mousedown', startCaptionDrag);
+
+    overlay.appendChild(el);
+  });
+}
+
+function startCaptionDrag(e) {
+  e.preventDefault();
+  const el = e.currentTarget;
+  const id = el.dataset.id;
+  const wrapRect = document.getElementById('videoWrapper').getBoundingClientRect();
+  const videoEl = document.getElementById('videoEl');
+  const rect = videoEl.getBoundingClientRect();
+
+  const offsetX = e.clientX - parseFloat(el.style.left);
+  const offsetY = e.clientY - parseFloat(el.style.top);
+
+  function onMove(ev) {
+    const nx = ev.clientX - offsetX;
+    const ny = ev.clientY - offsetY;
+    el.style.left = nx + 'px';
+    el.style.top = ny + 'px';
+
+    const cap = captions.find(c => c.id === id);
+    if (cap) {
+      const vOffX = rect.left - wrapRect.left;
+      const vOffY = rect.top - wrapRect.top;
+      cap.posX = Math.max(1, Math.min(99, ((nx - vOffX) / rect.width * 100)));
+      cap.posY = Math.max(1, Math.min(99, ((ny - vOffY) / rect.height * 100)));
+      document.getElementById('posX').value = Math.round(cap.posX);
+      document.getElementById('posY').value = Math.round(cap.posY);
+    }
+  }
+
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+// ─────────────────────────────────────────
+// STYLE CONTROLS
+// ─────────────────────────────────────────
+function getStyle() {
+  if (applyScope === 'all') return globalStyle;
+  const cap = captions.find(c => c.id === selectedId);
+  return cap ? cap.style : globalStyle;
+}
+
+function updateStyle(prop, val) {
+  if (applyScope === 'all') {
+    globalStyle[prop] = val;
+    captions.forEach(c => c.style[prop] = val);
+  } else {
+    globalStyle[prop] = val;
+    const cap = captions.find(c => c.id === selectedId);
+    if (cap) cap.style[prop] = val;
+  }
+  renderCaptionOverlay();
+}
+
+function setWeight(w, btn) {
+  document.querySelectorAll('[onclick^="setWeight"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateStyle('fontWeight', w);
+}
+
+function setTransform(t, btn) {
+  document.querySelectorAll('[onclick^="setTransform"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateStyle('textTransform', t);
+}
+
+function setAlign(a, btn) {
+  document.querySelectorAll('[onclick^="setAlign"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateStyle('textAlign', a);
+}
+
+function updateBg() {
+  const enabled = document.getElementById('bgToggle').checked;
+  const color = document.getElementById('bgColor').value;
+  const opacity = parseInt(document.getElementById('bgOpacity').value);
+
+  globalStyle.bgEnabled = enabled;
+  globalStyle.bgColor = color;
+  globalStyle.bgOpacity = opacity;
+
+  if (applyScope === 'all') {
+    captions.forEach(c => { c.style.bgEnabled = enabled; c.style.bgColor = color; c.style.bgOpacity = opacity; });
+  } else {
+    const cap = captions.find(c => c.id === selectedId);
+    if (cap) { cap.style.bgEnabled = enabled; cap.style.bgColor = color; cap.style.bgOpacity = opacity; }
+  }
+  renderCaptionOverlay();
+}
+
+function updateStroke() {
+  const enabled = document.getElementById('strokeToggle').checked;
+  const color = document.getElementById('strokeColor').value;
+  const width = parseInt(document.getElementById('strokeWidth').value);
+
+  globalStyle.strokeEnabled = enabled;
+  globalStyle.strokeColor = color;
+  globalStyle.strokeWidth = width;
+
+  if (applyScope === 'all') {
+    captions.forEach(c => { c.style.strokeEnabled = enabled; c.style.strokeColor = color; c.style.strokeWidth = width; });
+  } else {
+    const cap = captions.find(c => c.id === selectedId);
+    if (cap) { cap.style.strokeEnabled = enabled; cap.style.strokeColor = color; cap.style.strokeWidth = width; }
+  }
+  renderCaptionOverlay();
+}
+
+function updateShadow() {
+  const enabled = document.getElementById('shadowToggle').checked;
+  const color = document.getElementById('shadowColor').value;
+  const blur = parseInt(document.getElementById('shadowBlur').value);
+
+  globalStyle.shadowEnabled = enabled;
+  globalStyle.shadowColor = color;
+  globalStyle.shadowBlur = blur;
+
+  if (applyScope === 'all') {
+    captions.forEach(c => { c.style.shadowEnabled = enabled; c.style.shadowColor = color; c.style.shadowBlur = blur; });
+  } else {
+    const cap = captions.find(c => c.id === selectedId);
+    if (cap) { cap.style.shadowEnabled = enabled; cap.style.shadowColor = color; cap.style.shadowBlur = blur; }
+  }
+  renderCaptionOverlay();
+}
+
+function setPosition(x, y, btn) {
+  document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('posX').value = x;
+  document.getElementById('posY').value = y;
+  applyPositionToCaption(x, y);
+}
+
+function updatePositionFromInputs() {
+  const x = parseFloat(document.getElementById('posX').value);
+  const y = parseFloat(document.getElementById('posY').value);
+  applyPositionToCaption(x, y);
+}
+
+function applyPositionToCaption(x, y) {
+  globalStyle.posX = x;
+  globalStyle.posY = y;
+  if (applyScope === 'all') {
+    captions.forEach(c => { c.posX = x; c.posY = y; });
+  } else {
+    const cap = captions.find(c => c.id === selectedId);
+    if (cap) { cap.posX = x; cap.posY = y; }
+  }
+  renderCaptionOverlay();
+}
+
+function setApplyScope(scope, btn) {
+  applyScope = scope;
+  document.getElementById('applySelected').classList.toggle('active', scope === 'selected');
+  document.getElementById('applyAll').classList.toggle('active', scope === 'all');
+}
+
+function pickColor(inputId, hex, swatchEl) {
+  document.getElementById(inputId).value = hex;
+  swatchEl.closest('.color-swatch-row')?.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  swatchEl.classList.add('active');
+  if (inputId === 'fontColor') updateStyle('color', hex);
+}
+
+function syncStylePanelToStyle(s) {
+  document.getElementById('fontFamily').value = s.fontFamily;
+  document.getElementById('fontSize').value = parseInt(s.fontSize);
+  document.getElementById('fontSizeVal').textContent = parseInt(s.fontSize);
+  document.getElementById('fontColor').value = s.color;
+  document.getElementById('bgToggle').checked = s.bgEnabled;
+  document.getElementById('bgColor').value = s.bgColor;
+  document.getElementById('bgOpacity').value = s.bgOpacity;
+  document.getElementById('bgOpVal').textContent = s.bgOpacity + '%';
+  document.getElementById('strokeToggle').checked = s.strokeEnabled;
+  document.getElementById('shadowToggle').checked = s.shadowEnabled;
+  document.getElementById('shadowBlur').value = s.shadowBlur;
+  document.getElementById('shadowBlurVal').textContent = s.shadowBlur;
+}
+
+// ─────────────────────────────────────────
+// TIMELINE
+// ─────────────────────────────────────────
+function renderTimeline() {
+  const inner = document.getElementById('timelineInner');
+  const ticks = document.getElementById('timelineTicks');
+  const track = document.getElementById('timelineTrack');
+
+  if (!videoDuration) return;
+
+  const totalW = Math.max(800, videoDuration * pxPerSec * zoom);
+  inner.style.width = totalW + 'px';
+
+  // Ticks
+  ticks.innerHTML = '';
+  ticks.style.width = totalW + 'px';
+  const interval = zoom >= 2 ? 1 : zoom >= 0.5 ? 5 : 10;
+  for (let t = 0; t <= videoDuration; t += interval) {
+    const x = t * pxPerSec * zoom;
+    const lbl = document.createElement('div');
+    lbl.className = 'tick-label';
+    lbl.style.left = x + 'px';
+    lbl.textContent = Math.floor(t/60).toString().padStart(2,'0') + ':' + (t%60).toString().padStart(2,'0');
+    ticks.appendChild(lbl);
+    const line = document.createElement('div');
+    line.className = 'tick-line';
+    line.style.left = x + 'px';
+    ticks.appendChild(line);
+  }
+
+  // Remove old caption blocks
+  track.querySelectorAll('.caption-block').forEach(el => el.remove());
+  track.style.width = (totalW - 16) + 'px';
+
+  // Render caption blocks
+  captions.forEach(cap => {
+    const x = cap.start * pxPerSec * zoom;
+    const w = Math.max(40, (cap.end - cap.start) * pxPerSec * zoom);
+
+    const block = document.createElement('div');
+    block.className = 'caption-block' + (cap.id === selectedId ? ' selected' : '');
+    block.style.left = x + 'px';
+    block.style.width = w + 'px';
+    block.textContent = cap.text;
+    block.title = cap.text;
+
+    // Drag to move
+    block.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('resize-handle')) return;
+      e.preventDefault();
+      selectCaption(cap.id);
+      const startX = e.clientX;
+      const origStart = cap.start;
+      const origEnd = cap.end;
+      const dur = origEnd - origStart;
+
+      function onMove(ev) {
+        const dx = ev.clientX - startX;
+        const dt = dx / (pxPerSec * zoom);
+        cap.start = Math.max(0, origStart + dt);
+        cap.end = cap.start + dur;
+        block.style.left = (cap.start * pxPerSec * zoom) + 'px';
+        renderCaptionList();
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        renderTimeline();
+        saveToStorage();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Click to select & seek
+    block.addEventListener('click', e => {
+      selectCaption(cap.id);
+      video.currentTime = cap.start;
+    });
+
+    // Resize handle
+    const handle = document.createElement('div');
+    handle.className = 'resize-handle';
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const origEnd = cap.end;
+      function onMove(ev) {
+        const dx = ev.clientX - startX;
+        cap.end = Math.max(cap.start + 0.2, origEnd + dx / (pxPerSec * zoom));
+        block.style.width = Math.max(40, (cap.end - cap.start) * pxPerSec * zoom) + 'px';
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        renderTimeline(); renderCaptionList(); saveToStorage();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    block.appendChild(handle);
+    track.appendChild(block);
+  });
+
+  updateTimelinePlayhead();
+}
+
+function updateTimelinePlayhead() {
+  if (!videoDuration) return;
+  const x = video.currentTime * pxPerSec * zoom + 8;
+  document.getElementById('timelinePlayhead').style.left = x + 'px';
+}
+
+function zoomIn() {
+  zoom = Math.min(zoom * 1.5, 8);
+  document.getElementById('zoomLabel').textContent = zoom.toFixed(1) + '×';
+  renderTimeline();
+}
+
+function zoomOut() {
+  zoom = Math.max(zoom / 1.5, 0.2);
+  document.getElementById('zoomLabel').textContent = zoom.toFixed(1) + '×';
+  renderTimeline();
+}
+
+// Seek on timeline click
+document.getElementById('timelineBody').addEventListener('click', e => {
+  if (!videoDuration) return;
+  const inner = document.getElementById('timelineInner');
+  const rect = inner.getBoundingClientRect();
+  const x = e.clientX - rect.left - 8;
+  const t = x / (pxPerSec * zoom);
+  if (t >= 0 && t <= videoDuration) video.currentTime = t;
+});
+
+// ─────────────────────────────────────────
+// WAVEFORM DECORATION
+// ─────────────────────────────────────────
+function renderWaveformDeco() {
+  const svg = document.getElementById('waveformDeco');
+  let path = 'M0 30 ';
+  const pts = 200;
+  for (let i = 1; i <= pts; i++) {
+    const x = (i / pts) * 800;
+    const amp = 5 + Math.random() * 22;
+    const y = 30 + (Math.random() > 0.5 ? amp : -amp);
+    path += `L${x} ${y} `;
+  }
+  svg.innerHTML = `<path d="${path}" fill="none" stroke="var(--cyan)" stroke-width="1.5"/>`;
+}
+
+// ─────────────────────────────────────────
+// PROGRESS
+// ─────────────────────────────────────────
+function showProgress(title, pct) {
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('progressTitle').textContent = title;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressSub').textContent = pct + '%';
+}
+
+function updateProgress(pct, sub) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressSub').textContent = sub || pct + '%';
+}
+
+function hideProgress() {
+  document.getElementById('progressWrap').classList.remove('visible');
+}
+
+// ─────────────────────────────────────────
+// EXPORT
+// ─────────────────────────────────────────
+function openExportModal() {
+  if (!videoFile) { alert('Please upload a video first.'); return; }
+  if (captions.length === 0) { alert('No captions to export. Please transcribe or add captions first.'); return; }
+  document.getElementById('exportModal').classList.add('visible');
+}
+
+function closeExportModal() {
+  document.getElementById('exportModal').classList.remove('visible');
+}
+
+function selectExportFmt(el) {
+  document.querySelectorAll('.export-option').forEach(o => {
+    o.classList.remove('selected');
+    o.style.borderColor = '';
+    o.style.background = '';
+  });
+  el.classList.add('selected');
+  if (el.dataset.fmt === 'wordbyword') {
+    el.style.borderColor = 'var(--amber)';
+    el.style.background = 'rgba(255,184,0,0.08)';
+  }
+  selectedExportFmt = el.dataset.fmt;
+  // Show/hide word-by-word settings
+  const wbw = document.getElementById('wbwSettings');
+  if (wbw) wbw.style.display = el.dataset.fmt === 'wordbyword' ? 'block' : 'none';
+}
+
+function doExport() {
+  closeExportModal();
+  if (selectedExportFmt === 'wordbyword') exportWordByWord();
+  else if (selectedExportFmt === 'video') exportVideoWithCaptions();
+  else if (selectedExportFmt === 'srt') exportSRT();
+  else if (selectedExportFmt === 'vtt') exportVTT();
+  else if (selectedExportFmt === 'json') exportJSON();
+  else if (selectedExportFmt === 'txt') exportTXT();
+}
+
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+// ─────────────────────────────────────────
+// ★ WORD-BY-WORD TIKTOK EXPORT
+// Splits every caption into individual words.
+// Each word flashes center-screen for ~0.4s
+// with a bold font + black pill background —
+// exactly replicating the Japan video style.
+// ─────────────────────────────────────────
+async function exportWordByWord() {
+  if (!videoFile || captions.length === 0) {
+    alert('Need a video and captions first.');
+    return;
+  }
+
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+    ? 'video/webm;codecs=vp9,opus'
+    : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+    ? 'video/webm;codecs=vp8,opus'
+    : MediaRecorder.isTypeSupported('video/webm')
+    ? 'video/webm' : null;
+
+  if (!mimeType) { alert('Please use Chrome or Edge for video export.'); return; }
+
+  // ── Settings from modal ──
+  const secPerWord = parseFloat(document.getElementById('wbwSpeed')?.value || 0.4);
+  const fontSize   = parseInt(document.getElementById('wbwSize')?.value || 72);
+  const textColor  = document.getElementById('wbwColor')?.value || '#ffffff';
+  const pillColor  = document.getElementById('wbwBg')?.value || '#000000';
+  const posY       = parseInt(document.getElementById('wbwPosY')?.value || 50);
+
+  // ── Build a STRICTLY SEQUENTIAL word timeline ──
+  // Root cause of overlap: multiple Groq caption segments have
+  // overlapping or touching start/end times, so their word slots
+  // collide on the same frame. Fix: collect ALL words in order,
+  // then assign non-overlapping timestamps sequentially, anchored
+  // to the original caption start times but never overlapping.
+
+  // Step 1: collect every word in chronological order
+  const allWords = [];
+  const sortedCaptions = [...captions].sort((a, b) => a.start - b.start);
+
+  sortedCaptions.forEach(cap => {
+    const words = (cap.text || '')
+      .trim()
+      .split(/\s+/)
+      .filter(w => w.length > 0)
+      .map(w => w.toUpperCase());
+    if (!words.length) return;
+    words.forEach(word => allWords.push({ word, capStart: cap.start, capEnd: cap.end }));
+  });
+
+  // Step 2: assign strictly sequential, non-overlapping time slots.
+  // Each word gets exactly secPerWord. We anchor the first word of
+  // each caption at the caption's start, but if the previous word's
+  // end time is later, we push forward to avoid overlap.
+  const wordEvents = [];
+  let cursor = 0; // tracks the earliest the next word can start
+
+  let capWordIndex = 0;
+  sortedCaptions.forEach(cap => {
+    const words = (cap.text || '')
+      .trim()
+      .split(/\s+/)
+      .filter(w => w.length > 0)
+      .map(w => w.toUpperCase());
+    if (!words.length) return;
+
+    // Snap cursor to cap.start if there's a gap (silence between captions)
+    if (cap.start > cursor + 0.05) cursor = cap.start;
+
+    // Distribute words across [cursor … cap.end], one word at a time
+    const available = Math.max((cap.end || cursor + words.length * secPerWord) - cursor, words.length * 0.2);
+    const wDur = Math.min(secPerWord, available / words.length);
+
+    words.forEach((word, i) => {
+      const wStart = cursor + i * wDur;
+      const wEnd   = wStart + wDur;
+      wordEvents.push({ word, start: wStart, end: wEnd });
+    });
+
+    // Move cursor to end of last word in this caption
+    cursor += words.length * wDur;
+  });
+
+  // Final safety pass: ensure no two events overlap at all
+  for (let i = 1; i < wordEvents.length; i++) {
+    if (wordEvents[i].start < wordEvents[i-1].end) {
+      const dur = wordEvents[i].end - wordEvents[i].start;
+      wordEvents[i].start = wordEvents[i-1].end;
+      wordEvents[i].end   = wordEvents[i].start + dur;
+    }
+  }
+
+  renderCancelled = false;
+  document.getElementById('renderModal').classList.add('visible');
+  setRenderStatus(`Building word timeline — ${wordEvents.length} words…`, 2);
+
+  // ── Setup source video ──
+  const srcVideo = document.createElement('video');
+  srcVideo.src = URL.createObjectURL(videoFile);
+  srcVideo.muted = false;
+  await new Promise((res, rej) => { srcVideo.onloadedmetadata = res; srcVideo.onerror = rej; });
+
+  const vw = srcVideo.videoWidth  || 1080;
+  const vh = srcVideo.videoHeight || 1920;
+
+  const canvas = document.getElementById('renderCanvas');
+  canvas.width  = vw;
+  canvas.height = vh;
+  const ctx = canvas.getContext('2d');
+
+  // ── Audio ──
+  let audioCtx, audioDest;
+  try {
+    audioCtx = new AudioContext();
+    const src = audioCtx.createMediaElementSource(srcVideo);
+    audioDest = audioCtx.createMediaStreamDestination();
+    src.connect(audioDest);
+    src.connect(audioCtx.destination);
+  } catch(e) { console.warn('Audio unavailable:', e.message); }
+
+  const canvasStream = canvas.captureStream(60);
+  if (audioDest) audioDest.stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+
+  const chunks = [];
+  const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 8_000_000 });
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  recorder.onstop = () => {
+    if (renderCancelled) return;
+    setRenderStatus('Packaging…', 99);
+    const blob = new Blob(chunks, { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `tiktok_wbw_${Date.now()}.webm`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    document.getElementById('renderModal').classList.remove('visible');
+    setStatus('done', `✓ ${wordEvents.length} WORDS EXPORTED`);
+    if (audioCtx) audioCtx.close();
+  };
+
+  // ── Pre-load font ──
+  const fontFamily = (globalStyle.fontFamily || "'Montserrat',sans-serif")
+    .replace(/'/g,'"').split(',')[0].replace(/"/g,'').trim();
+  try {
+    await document.fonts.load(`900 ${fontSize}px "${fontFamily}"`);
+    await document.fonts.load(`bold ${fontSize}px "${fontFamily}"`);
+  } catch(e) {}
+
+  recorder.start(100);
+  srcVideo.currentTime = 0;
+  setRenderStatus('Rendering word-by-word flash…', 5);
+
+  const startWall = performance.now();
+  let lastUI = -1;
+
+  // ── Pill drawing helper ──
+  function drawWordPill(word, t) {
+    if (!word) return;
+
+    const x = vw / 2;
+    const y = (posY / 100) * vh;
+
+    ctx.save();
+    ctx.font      = `900 ${fontSize}px "${fontFamily}"`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const tw   = ctx.measureText(word).width;
+    const th   = fontSize * 1.15;
+    const padX = fontSize * 0.42;
+    const padY = fontSize * 0.18;
+    const bw   = tw + padX * 2;
+    const bh   = th + padY * 2;
+    const bx   = x - bw / 2;
+    const by   = y - bh / 2;
+    const rx   = bh * 0.28; // nice rounded pill
+
+    // ── Pill background ──
+    const rgb = hexToRgb(pillColor);
+    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+    ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},0.88)`;
+    ctx.beginPath();
+    ctx.moveTo(bx + rx, by);
+    ctx.lineTo(bx + bw - rx, by);
+    ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + rx);
+    ctx.lineTo(bx + bw, by + bh - rx);
+    ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - rx, by + bh);
+    ctx.lineTo(bx + rx, by + bh);
+    ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - rx);
+    ctx.lineTo(bx, by + rx);
+    ctx.quadraticCurveTo(bx, by, bx + rx, by);
+    ctx.closePath();
+    ctx.fill();
+
+    // ── Text shadow ──
+    ctx.shadowColor   = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur    = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
+    // ── Word text ──
+    ctx.fillStyle = textColor;
+    ctx.fillText(word, x, y);
+
+    ctx.restore();
+  }
+
+  function drawFrame() {
+    if (renderCancelled) {
+      try { recorder.stop(); } catch(e) {}
+      srcVideo.pause();
+      if (audioCtx) audioCtx.close();
+      return;
+    }
+
+    const t   = srcVideo.currentTime;
+    const pct = videoDuration ? (t / videoDuration * 100) : 0;
+
+    // 1. Video frame
+    ctx.drawImage(srcVideo, 0, 0, vw, vh);
+
+    // 2. Find which word is active RIGHT NOW
+    const active = wordEvents.find(w => t >= w.start && t < w.end);
+    if (active) drawWordPill(active.word, t);
+
+    // 3. Progress UI
+    if (t - lastUI > 0.35) {
+      lastUI = t;
+      const elapsed = (performance.now() - startWall) / 1000;
+      const speed   = elapsed > 0 ? t / elapsed : 1;
+      const eta     = speed > 0 ? Math.max(0, (videoDuration - t) / speed).toFixed(0) : '…';
+      const wIdx    = wordEvents.filter(w => w.end <= t).length;
+      setRenderStatus(
+        `Word ${wIdx}/${wordEvents.length} · ${t.toFixed(1)}s / ${videoDuration.toFixed(1)}s`,
+        Math.min(97, pct)
+      );
+      document.getElementById('renderETA').textContent =
+        `⚡ ${speed.toFixed(1)}× · ~${eta}s left`;
+    }
+
+    // 4. Continue or finish
+    if (t < videoDuration - 0.04 && !renderCancelled) {
+      requestAnimationFrame(drawFrame);
+    } else {
+      setRenderStatus('Wrapping up…', 98);
+      setTimeout(() => { try { recorder.stop(); } catch(e) {} srcVideo.pause(); }, 400);
+    }
+  }
+
+  srcVideo.playbackRate = 1.0;
+  try { await srcVideo.play(); }
+  catch(e) { srcVideo.muted = true; await srcVideo.play(); }
+
+  requestAnimationFrame(drawFrame);
+  srcVideo.onended = () => {
+    if (!renderCancelled) setTimeout(() => { try { recorder.stop(); } catch(e) {} }, 500);
+  };
+}
+
+// ─────────────────────────────────────────
+// VIDEO BURN-IN EXPORT (Canvas + MediaRecorder)
+// Text is PERMANENTLY burned into every frame — not timed subtitles.
+// ─────────────────────────────────────────
+let renderCancelled = false;
+
+function cancelRender() {
+  renderCancelled = true;
+  document.getElementById('renderModal').classList.remove('visible');
+  setStatus('active', 'EXPORT CANCELLED');
+}
+
+async function exportVideoWithCaptions() {
+  if (!videoFile) {
+    alert('Please upload a video first.');
+    return;
+  }
+  if (captions.length === 0) {
+    alert('No text overlays to burn in. Please add at least one caption.');
+    return;
+  }
+
+  // Check MediaRecorder support
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+    ? 'video/webm;codecs=vp9,opus'
+    : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+    ? 'video/webm;codecs=vp8,opus'
+    : MediaRecorder.isTypeSupported('video/webm')
+    ? 'video/webm'
+    : null;
+
+  if (!mimeType) {
+    alert('Your browser does not support video recording.\nPlease use Chrome or Edge.');
+    return;
+  }
+
+  renderCancelled = false;
+  document.getElementById('renderModal').classList.add('visible');
+  setRenderStatus('Setting up canvas renderer…', 0);
+
+  // Offscreen video element
+  const srcVideo = document.createElement('video');
+  srcVideo.src = URL.createObjectURL(videoFile);
+  srcVideo.muted = false;
+  srcVideo.crossOrigin = 'anonymous';
+
+  await new Promise((res, rej) => {
+    srcVideo.onloadedmetadata = res;
+    srcVideo.onerror = rej;
+  });
+
+  const vw = srcVideo.videoWidth || 1280;
+  const vh = srcVideo.videoHeight || 720;
+
+  // Canvas at full video resolution
+  const canvas = document.getElementById('renderCanvas');
+  canvas.width = vw;
+  canvas.height = vh;
+  const ctx = canvas.getContext('2d');
+
+  // Audio capture
+  let audioCtx, audioSource, audioDest;
+  try {
+    audioCtx = new AudioContext();
+    audioSource = audioCtx.createMediaElementSource(srcVideo);
+    audioDest = audioCtx.createMediaStreamDestination();
+    audioSource.connect(audioDest);
+    audioSource.connect(audioCtx.destination);
+  } catch(e) {
+    console.warn('Audio capture unavailable:', e.message);
+  }
+
+  // Canvas stream + audio
+  const canvasStream = canvas.captureStream(30);
+  if (audioDest) {
+    audioDest.stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+  }
+
+  // MediaRecorder
+  const chunks = [];
+  const recorder = new MediaRecorder(canvasStream, {
+    mimeType,
+    videoBitsPerSecond: 5_000_000
+  });
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  recorder.onstop = () => {
+    if (renderCancelled) return;
+    setRenderStatus('Packaging video file…', 99);
+    const blob = new Blob(chunks, { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `captionai_${Date.now()}.webm`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    document.getElementById('renderModal').classList.remove('visible');
+    setStatus('done', '✓ VIDEO EXPORTED');
+    if (audioCtx) audioCtx.close();
+  };
+
+  // Pre-load all fonts used by text overlays
+  setRenderStatus('Loading fonts…', 3);
+  const usedFonts = [...new Set(captions.map(c => {
+    const ff = (c.style?.fontFamily || globalStyle.fontFamily);
+    return ff.replace(/['"]/g, '').split(',')[0].trim();
+  }))];
+  for (const f of usedFonts) {
+    try {
+      await document.fonts.load(`bold 40px "${f}"`);
+      await document.fonts.load(`900 40px "${f}"`);
+    } catch(e) {}
+  }
+
+  recorder.start(100);
+  srcVideo.currentTime = 0;
+  setRenderStatus('Rendering — text burned into every frame…', 5);
+
+  const startWall = performance.now();
+  let lastUIUpdate = -1;
+
+  function drawFrame() {
+    if (renderCancelled) {
+      try { recorder.stop(); } catch(e) {}
+      srcVideo.pause();
+      if (audioCtx) audioCtx.close();
+      return;
+    }
+
+    const t = srcVideo.currentTime;
+    const pct = videoDuration ? (t / videoDuration * 100) : 0;
+
+    // ── 1. Draw the raw video frame ──
+    ctx.drawImage(srcVideo, 0, 0, vw, vh);
+
+    // ── 2. Draw only captions whose time window is active ──
+    //    Each caption shows at its own start→end time, styled as
+    //    big attractive text — NOT all stacked at once.
+    //    This matches exactly what you see in the preview.
+    const activeNow = captions.filter(c => t >= c.start && t <= c.end);
+    activeNow.forEach(cap => drawTextOverlay(ctx, cap, vw, vh));
+
+    // ── 3. Update progress UI ──
+    if (t - lastUIUpdate > 0.4) {
+      lastUIUpdate = t;
+      const elapsed = (performance.now() - startWall) / 1000;
+      const speed = elapsed > 0 ? t / elapsed : 1;
+      const eta = speed > 0 ? Math.max(0, ((videoDuration - t) / speed)).toFixed(0) : '…';
+      setRenderStatus(
+        `Burning text into frame ${t.toFixed(2)}s / ${videoDuration.toFixed(2)}s`,
+        Math.min(97, pct)
+      );
+      document.getElementById('renderETA').textContent =
+        `⚡ ${speed.toFixed(1)}× speed · ~${eta}s remaining · ${captions.length} text overlay${captions.length !== 1 ? 's' : ''}`;
+    }
+
+    // ── 4. Continue or finish ──
+    if (t < videoDuration - 0.04 && !renderCancelled) {
+      requestAnimationFrame(drawFrame);
+    } else {
+      setRenderStatus('Finishing up…', 98);
+      setTimeout(() => {
+        try { recorder.stop(); } catch(e) {}
+        srcVideo.pause();
+      }, 400);
+    }
+  }
+
+  // Start playback
+  srcVideo.playbackRate = 1.0;
+  try {
+    await srcVideo.play();
+  } catch(e) {
+    srcVideo.muted = true;
+    try { await srcVideo.play(); } catch(e2) {
+      alert('Could not play video for rendering. Please try again.');
+      document.getElementById('renderModal').classList.remove('visible');
+      return;
+    }
+  }
+
+  requestAnimationFrame(drawFrame);
+
+  srcVideo.onended = () => {
+    if (!renderCancelled) {
+      setTimeout(() => { try { recorder.stop(); } catch(e) {} }, 500);
+    }
+  };
+}
+
+// ─────────────────────────────────────────
+// DRAW ONE TEXT OVERLAY ONTO CANVAS
+// Full word-wrap + multi-line — matches the preview exactly.
+// Called for EVERY frame — text is always visible (not time-gated)
+// ─────────────────────────────────────────
+function drawTextOverlay(ctx, cap, vw, vh) {
+  const s = cap.style || globalStyle;
+
+  const fontSize      = parseInt(s.fontSize) || 28;
+  const rawFamily     = (s.fontFamily || "'Montserrat', sans-serif").replace(/'/g, '"');
+  const fontFamily    = rawFamily.split(',')[0].replace(/['"]/g, '').trim();
+  const fontWeight    = s.fontWeight || '700';
+  const color         = s.color || '#ffffff';
+  const textTransform = s.textTransform || 'none';
+  const textAlign     = s.textAlign || 'center';
+  const letterSpacing = parseFloat(s.letterSpacing) || 0;
+  const lineHeight    = fontSize * 1.35;
+
+  // Apply text transform
+  let rawText = (cap.text || '').trim();
+  if (!rawText) return;
+  if (textTransform === 'uppercase')   rawText = rawText.toUpperCase();
+  else if (textTransform === 'lowercase')  rawText = rawText.toLowerCase();
+  else if (textTransform === 'capitalize') rawText = rawText.replace(/\b\w/g, l => l.toUpperCase());
+
+  // Anchor position — stored as % of video dimensions
+  // Clamp so text never overflows outside the video frame
+  const anchorX = ((cap.posX != null ? cap.posX : 50) / 100) * vw;
+  const rawAnchorY = ((cap.posY != null ? cap.posY : 85) / 100) * vh;
+  // Reserve space at bottom so multi-line text doesn't go below frame
+  const estimatedLines = Math.ceil(rawText.length / 30) || 1;
+  const estimatedH = estimatedLines * lineHeight;
+  const anchorY = Math.min(rawAnchorY, vh - estimatedH / 2 - fontSize * 0.3);
+
+  ctx.save();
+  ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = textAlign === 'left' ? 'left'
+                : textAlign === 'right' ? 'right'
+                : 'center';
+
+  // ── Max width for wrapping: 80% of video width ──
+  const maxW = vw * 0.80;
+
+  // ── Measure a string with letter-spacing ──
+  function measureSpaced(txt) {
+    if (!txt) return 0;
+    if (letterSpacing === 0) return ctx.measureText(txt).width;
+    let w = 0;
+    for (const ch of txt) w += ctx.measureText(ch).width + letterSpacing;
+    return Math.max(0, w - letterSpacing);
+  }
+
+  // ── Word-wrap: split text into lines that fit within maxW ──
+  function wrapText(txt) {
+    // First honour explicit newlines in the text
+    const paragraphs = txt.split(/\n/);
+    const lines = [];
+    for (const para of paragraphs) {
+      const words = para.split(' ');
+      let line = '';
+      for (const word of words) {
+        const test = line ? line + ' ' + word : word;
+        if (measureSpaced(test) <= maxW) {
+          line = test;
+        } else {
+          if (line) lines.push(line);
+          // If a single word is wider than maxW, push it anyway
+          line = word;
+        }
+      }
+      if (line) lines.push(line);
+    }
+    return lines.length ? lines : [txt];
+  }
+
+  const lines = wrapText(rawText);
+  const totalH = lines.length * lineHeight;
+
+  // ── Draw helpers with letter-spacing per line ──
+  function fillSpaced(txt, tx, ty) {
+    if (letterSpacing === 0) { ctx.fillText(txt, tx, ty); return; }
+    const totalW = measureSpaced(txt);
+    let cx = textAlign === 'center' ? tx - totalW / 2
+           : textAlign === 'right'  ? tx - totalW : tx;
+    const saved = ctx.textAlign;
+    ctx.textAlign = 'left';
+    for (const ch of txt) {
+      ctx.fillText(ch, cx, ty);
+      cx += ctx.measureText(ch).width + letterSpacing;
+    }
+    ctx.textAlign = saved;
+  }
+
+  function strokeSpaced(txt, tx, ty) {
+    if (letterSpacing === 0) { ctx.strokeText(txt, tx, ty); return; }
+    const totalW = measureSpaced(txt);
+    let cx = textAlign === 'center' ? tx - totalW / 2
+           : textAlign === 'right'  ? tx - totalW : tx;
+    const saved = ctx.textAlign;
+    ctx.textAlign = 'left';
+    for (const ch of txt) {
+      ctx.strokeText(ch, cx, ty);
+      cx += ctx.measureText(ch).width + letterSpacing;
+    }
+    ctx.textAlign = saved;
+  }
+
+  // ── Background box around ALL lines ──
+  if (s.bgEnabled) {
+    const rgb   = hexToRgb(s.bgColor || '#000000');
+    const alpha = (s.bgOpacity != null ? s.bgOpacity : 70) / 100;
+    const padX  = fontSize * 0.5;
+    const padY  = fontSize * 0.25;
+    // Widest line determines box width
+    const boxW  = Math.max(...lines.map(l => measureSpaced(l))) + padX * 2;
+    const boxH  = totalH + padY * 2;
+    const boxY  = anchorY - totalH / 2 - padY;
+    const boxX  = textAlign === 'center' ? anchorX - boxW / 2
+                : textAlign === 'right'  ? anchorX - boxW + padX
+                : anchorX - padX;
+    const rx = Math.min(8, fontSize * 0.2);
+
+    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+    ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(boxX + rx, boxY);
+    ctx.lineTo(boxX + boxW - rx, boxY);
+    ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + rx);
+    ctx.lineTo(boxX + boxW, boxY + boxH - rx);
+    ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - rx, boxY + boxH);
+    ctx.lineTo(boxX + rx, boxY + boxH);
+    ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - rx);
+    ctx.lineTo(boxX, boxY + rx);
+    ctx.quadraticCurveTo(boxX, boxY, boxX + rx, boxY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── Draw each line ──
+  lines.forEach((line, i) => {
+    // Vertical centre of this line
+    const ly = anchorY - totalH / 2 + i * lineHeight + lineHeight / 2;
+
+    // Stroke pass (outline)
+    if (s.strokeEnabled) {
+      ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+      ctx.strokeStyle = s.strokeColor || '#000000';
+      ctx.lineWidth   = (s.strokeWidth || 2) * 2;
+      ctx.lineJoin    = 'round';
+      strokeSpaced(line, anchorX, ly);
+    }
+
+    // Shadow
+    if (s.shadowEnabled !== false) {
+      ctx.shadowColor   = s.shadowColor || '#000000';
+      ctx.shadowBlur    = s.shadowBlur != null ? s.shadowBlur : 6;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+    } else {
+      ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+    }
+
+    // Fill
+    ctx.fillStyle = color;
+    fillSpaced(line, anchorX, ly);
+
+    // Reset shadow after each line so background box isn't affected
+    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+  });
+
+  ctx.restore();
+}
+
+function setRenderStatus(msg, pct) {
+  document.getElementById('renderStatusText').textContent = msg;
+  document.getElementById('renderProgressBar').style.width = pct + '%';
+  document.getElementById('renderProgressPct').textContent = Math.round(pct) + '%';
+}
+
+// ─────────────────────────────────────────
+// SUBTITLE FILE EXPORTS
+// ─────────────────────────────────────────
+function exportSRT() {
+  let out = '';
+  captions.forEach((cap, i) => {
+    out += `${i+1}\n${formatSRTTime(cap.start)} --> ${formatSRTTime(cap.end)}\n${cap.text}\n\n`;
+  });
+  downloadFile(out, 'captions.srt', 'text/plain');
+}
+
+function exportVTT() {
+  let out = 'WEBVTT\n\n';
+  captions.forEach((cap, i) => {
+    const toVTT = s => {
+      const h = Math.floor(s/3600);
+      const m = Math.floor((s%3600)/60);
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}.${String(Math.round((s%1)*1000)).padStart(3,'0')}`;
+    };
+    out += `${i+1}\n${toVTT(cap.start)} --> ${toVTT(cap.end)}\n${cap.text}\n\n`;
+  });
+  downloadFile(out, 'captions.vtt', 'text/vtt');
+}
+
+function exportJSON() {
+  const data = { captions, exportedAt: new Date().toISOString(), version: '1.0' };
+  downloadFile(JSON.stringify(data, null, 2), 'captions.json', 'application/json');
+}
+
+function exportTXT() {
+  const out = captions.map(c => c.text).join('\n');
+  downloadFile(out, 'transcript.txt', 'text/plain');
+}
+
+// ─────────────────────────────────────────
+// LOCAL STORAGE
+// ─────────────────────────────────────────
+function saveToStorage() {
+  try {
+    localStorage.setItem('captionai_captions', JSON.stringify(captions));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem('captionai_captions');
+    if (saved) {
+      captions = JSON.parse(saved);
+      renderCaptionList();
+      renderTimeline();
+    }
+  } catch(e) {}
+}
+
+// ─────────────────────────────────────────
+// UNDO (simple)
+// ─────────────────────────────────────────
+let undoStack = [];
+function undo() {
+  if (undoStack.length) {
+    captions = undoStack.pop();
+    renderCaptionList();
+    renderTimeline();
+    renderCaptionOverlay();
+  }
+}
+
+function pushUndo() {
+  undoStack.push(JSON.parse(JSON.stringify(captions)));
+  if (undoStack.length > 20) undoStack.shift();
+}
+
+// ─────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+loadFromStorage();
+</script>
+</body>
+</html>
